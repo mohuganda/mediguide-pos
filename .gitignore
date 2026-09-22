@@ -74,3 +74,8 @@ mediguide/*.plist
 mediguide/*.jks
 mediguide/*.pfx
 mediguide/*.base64
+
+# SQLite in-memory artifacts and session files
+:memory:*
+*.ses
+*.session
