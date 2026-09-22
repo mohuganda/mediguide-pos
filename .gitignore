@@ -36,8 +36,6 @@
 !guidelines-platform/src/content/**/*.md
 !artifacts/guidelines/integrated-diabetes-management-guideline-uganda-summary.corrected.md
 !backend/cmd/seed/fixtures/outbreak-documents/*.md
-!ucg-disease-candidates-review.md
-!disease-data-format.md
 backend/.env
 backend/.env.local
 backend/.air_tmp/
@@ -81,3 +79,14 @@ mediguide/*.base64
 :memory:*
 *.ses
 *.session
+
+# UCG disease-taxonomy review output: the candidates extract_ucg_taxonomy.py
+# derives from guidelines-platform/src/content, plus the script that renders
+# them for review. Both the extractor and the reviewed fixture the seeder
+# embeds (backend/cmd/seed/fixtures/ucg-disease-taxonomy.csv) stay tracked.
+/build_review_doc.py
+/ucg-disease-candidates.json
+/ucg-disease-candidates.csv
+/ucg-disease-candidates-review.md
+/ucg-sections.json
+/disease-data-format.md
