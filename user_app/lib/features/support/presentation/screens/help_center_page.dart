@@ -309,8 +309,7 @@ class HelpCenterPage extends ConsumerWidget {
                             pagingState.error ??
                             'Unable to load support tickets',
                         title: 'Unable to load support requests',
-                        message:
-                            'Please check your connection and try again.',
+                        message: 'Please check your connection and try again.',
                         onRetry: fetchNextPage,
                       );
                     },

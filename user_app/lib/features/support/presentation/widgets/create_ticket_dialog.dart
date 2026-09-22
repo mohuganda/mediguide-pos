@@ -290,7 +290,9 @@ class _CreateTicketDialogState extends ConsumerState<CreateTicketDialog> {
                       : const Icon(LucideIcons.send),
                   label: Text(
                     state.isCreatingTicket
-                        ? (isGuest ? 'Sending request...' : 'Creating ticket...')
+                        ? (isGuest
+                              ? 'Sending request...'
+                              : 'Creating ticket...')
                         : (isGuest ? 'Send Request' : 'Create Ticket'),
                   ),
                 ),

@@ -123,7 +123,11 @@ class _GuestSupportView extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Icon(LucideIcons.lockKeyhole, size: 18, color: colors.primary),
+                  Icon(
+                    LucideIcons.lockKeyhole,
+                    size: 18,
+                    color: colors.primary,
+                  ),
                   AppSpacing.hGapSm,
                   Expanded(
                     child: Text(
