@@ -36,6 +36,8 @@
 !guidelines-platform/src/content/**/*.md
 !artifacts/guidelines/integrated-diabetes-management-guideline-uganda-summary.corrected.md
 !backend/cmd/seed/fixtures/outbreak-documents/*.md
+!ucg-disease-candidates-review.md
+!disease-data-format.md
 backend/.env
 backend/.env.local
 backend/.air_tmp/
