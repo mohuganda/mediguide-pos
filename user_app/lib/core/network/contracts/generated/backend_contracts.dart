@@ -8371,6 +8371,10 @@ final class ModelsSupportTicket {
 
   String? get priority => value['priority']?.toString();
 
+  String? get requesterEmail => value['requester_email']?.toString();
+
+  String? get requesterName => value['requester_name']?.toString();
+
   String? get status => value['status']?.toString();
 
   String? get subject => value['subject']?.toString();
@@ -17052,6 +17056,10 @@ final class ServicesSupportTicketCreate {
   String? get description => value['description']?.toString();
 
   String? get priority => value['priority']?.toString();
+
+  String? get requesterEmail => value['requester_email']?.toString();
+
+  String? get requesterName => value['requester_name']?.toString();
 
   String? get subject => value['subject']?.toString();
 

@@ -2589,11 +2589,21 @@ export interface ModelsSupportTicket {
   description?: string;
   id?: string;
   priority?: string;
+  requester_email?: string;
+  requester_name?: string;
   status?: string;
   subject?: string;
   updated_at?: string;
   user_email?: string;
+  /**
+   * UserID is nil for tickets submitted by unauthenticated visitors; those
+   * carry the requester's contact details instead.
+   */
   user_id?: string;
+  /**
+   * UserName and UserEmail resolve to the owner account when present and
+   * otherwise to the guest requester details.
+   */
   user_name?: string;
 }
 
@@ -5413,6 +5423,12 @@ export interface ServicesSupportTicketCreate {
   category?: string;
   description?: string;
   priority?: string;
+  requester_email?: string;
+  /**
+   * RequesterName and RequesterEmail identify unauthenticated submitters.
+   * They are ignored for tickets created by a signed-in user.
+   */
+  requester_name?: string;
   subject?: string;
 }
 
