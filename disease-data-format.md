@@ -86,6 +86,7 @@ mobile user can browse until content is assigned.
 |---|---|
 | `backend/migrations/00048_disease_taxonomy.sql` | 7 active diseases + 8 aliases, fixed UUIDs `90000000-0000-4000-8000-0000000000NN` / `91000000-…` |
 | `backend/cmd/seed/demo_disease_hubs.go` | re-upserts 6 of those, adds descriptions, icons, colours, 3 aliases, 6 ICD-10 codes, hubs, pillars, assignments |
+| `backend/cmd/seed/ucg_disease_taxonomy.go` (`SEED_SCOPE=disease-taxonomy`) | the reviewed UCG taxonomy: 387 new diseases, 44 aliases, 281 ICD-10 codes, reusing the 5 curated rows it overlaps. Data lives in `backend/cmd/seed/fixtures/ucg-disease-taxonomy.csv`, whose `seed_action` column holds the review decision per row |
 
 Seed conventions worth matching (`backend/cmd/seed/main.go`, `demo_disease_hubs.go`):
 
