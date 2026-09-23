@@ -76,3 +76,19 @@ mediguide/*.plist
 mediguide/*.jks
 mediguide/*.pfx
 mediguide/*.base64
+
+# SQLite in-memory artifacts and session files
+:memory:*
+*.ses
+*.session
+
+# UCG disease-taxonomy review output: the candidates extract_ucg_taxonomy.py
+# derives from guidelines-platform/src/content, plus the script that renders
+# them for review. Both the extractor and the reviewed fixture the seeder
+# embeds (backend/cmd/seed/fixtures/ucg-disease-taxonomy.csv) stay tracked.
+/build_review_doc.py
+/ucg-disease-candidates.json
+/ucg-disease-candidates.csv
+/ucg-disease-candidates-review.md
+/ucg-sections.json
+/disease-data-format.md
