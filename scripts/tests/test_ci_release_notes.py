@@ -128,7 +128,7 @@ $lanes[[:android, :play_store_notes]].call
         result = subprocess.check_output(["ruby", "-e", code, str(ROOT / "user_app/fastlane/Fastfile")],
                                          cwd=root / "fastlane", env=env, text=True)
         options = json.loads(result)
-        self.assertEqual(str(root / "fastlane/metadata/android"), options["metadata_path"])
+        self.assertEqual((root / "fastlane/metadata/android").resolve(), Path(options["metadata_path"]).resolve())
         self.assertEqual(11, options["version_code"])
         self.assertTrue(options["skip_upload_aab"])
         self.assertTrue(options["skip_upload_apk"])
