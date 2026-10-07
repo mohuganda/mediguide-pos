@@ -14,7 +14,7 @@ EXPECTED_PORTS = {
     "api": {"published": 8080, "target": 8080},
     "dashboard": {"published": 3000, "target": 3000},
     "guidelines": {"published": 5000, "target": 8080},
-    "minio": {"published": 9000, "target": 9000, "host_ip": "127.0.0.1"},
+    "minio": {"published": 9000, "target": 9000},
 }
 
 
@@ -80,8 +80,8 @@ def main() -> int:
         return 1
 
     print(
-        "Production publishes API, dashboard, and guidelines on all interfaces; "
-        "MinIO API binds only to loopback; other data and worker services remain internal."
+        "Production publishes API, dashboard, guidelines, and MinIO API on all interfaces; "
+        "the MinIO console and other data and worker services remain internal."
     )
     return 0
 

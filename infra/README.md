@@ -247,10 +247,9 @@ make prod-up
 make prod-ps
 ```
 
-The production stack publishes only API `8080`, dashboard `3000`, and
-guidelines `5000`, all on `0.0.0.0`. MinIO API `9000` binds only to
-`127.0.0.1` for host-installed Nginx. The MinIO console, PostgreSQL, Redis,
-Ollama, AI HTTP and AI gRPC remain inside the Compose network. Restrict the three
+The production stack publishes API `8080`, dashboard `3000`, guidelines
+`5000`, and MinIO API `9000`, all on `0.0.0.0`. The MinIO console, PostgreSQL, Redis,
+Ollama, AI HTTP and AI gRPC remain inside the Compose network. Restrict the four
 published ports with the host or provider firewall and place a TLS reverse
 proxy in front of them.
 The supported single-domain layout is `/` for Guidelines, `/admin` for the
@@ -276,7 +275,7 @@ S3 object paths and do not rewrite URLs after they have been signed.
 
 Set `S3_PUBLIC_ENDPOINT` to the hostname only and `S3_PUBLIC_SSL=true`.
 `MINIO_API_CORS_ALLOW_ORIGIN` must match the browser origin. The production
-base Compose file publishes only the MinIO API on loopback; a host-installed
+base Compose file publishes the MinIO API on `0.0.0.0:9000`; a host-installed
 proxy uses `127.0.0.1:9000`, while a container proxy can share the Compose
 network and use `minio:9000`. Do not use the server public IP as the upstream. Setting DNS or the env hostname alone does not create that
 proxy connection.
@@ -291,7 +290,7 @@ python3 infra/check-public-storage.py infra/production.env --check-network
 The production deployment script runs this check before replacing the stack.
 A missing endpoint, an unreachable public storage API, or website HTML
 returned in place of MinIO health stops deployment. On an existing server,
-apply the MinIO loopback port mapping before this preflight and confirm the
+apply the MinIO API port mapping before this preflight and confirm the
 Nginx routes are active. Reopen the asset library after deployment to generate
 new signed URLs; changing an already-signed hostname invalidates its signature.
 After a server-side env change, recreate the API with the same Compose and
@@ -426,9 +425,9 @@ Emergency/high-priority jobs receive the next available capacity; queue aging
 gradually raises older normal work so lower-priority documents are not starved.
 
 CI runs `infra/check-production-ports.py` against the rendered production
-definition and fails if a data or worker service is published beyond the
-MinIO API loopback exception, a public service
-targets the wrong container port, or one of the three HTTP listeners is not
+definition and fails if a service outside API, dashboard, guidelines and
+MinIO API publishes a port, a service targets the wrong container port, or
+one of the four listeners is not
 bound to the configured public interface.
 
 For the single-domain layout, set `PUBLIC_API_BASE_URL` to the HTTPS origin
