@@ -89,6 +89,22 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
+    # S3 signs the Host, path and query. Preserve all three. Change this bucket
+    # prefix if S3_BUCKET is not mediguide. Do not route the MinIO console.
+    location ^~ /mediguide/ {
+        proxy_pass http://127.0.0.1:9000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_request_buffering off;
+        proxy_buffering off;
+    }
+
+    location = /minio/health/live {
+        proxy_pass http://127.0.0.1:9000;
+        proxy_set_header Host $http_host;
+    }
+
     # Guidelines owns the public site and every remaining route.
     location / {
         proxy_pass http://127.0.0.1:5000;

@@ -24,6 +24,10 @@ services:
       MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD:-mediguide123}"
       MINIO_API_CORS_ALLOW_ORIGIN: "${MINIO_API_CORS_ALLOW_ORIGIN:-*}"
     restart: unless-stopped
+    # Host-installed Nginx reaches S3 through loopback; never publish the API
+    # or console on the server's public interface.
+    ports:
+      - "127.0.0.1:9000:9000"
     volumes:
       - minio_data:/data
     healthcheck:

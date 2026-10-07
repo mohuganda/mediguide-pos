@@ -248,8 +248,9 @@ make prod-ps
 ```
 
 The production stack publishes only API `8080`, dashboard `3000`, and
-guidelines `5000`, all on `0.0.0.0`. PostgreSQL, Redis, MinIO, Ollama, AI HTTP,
-and AI gRPC are reachable only inside the Compose network. Restrict the three
+guidelines `5000`, all on `0.0.0.0`. MinIO API `9000` binds only to
+`127.0.0.1` for host-installed Nginx. The MinIO console, PostgreSQL, Redis,
+Ollama, AI HTTP and AI gRPC remain inside the Compose network. Restrict the three
 published ports with the host or provider firewall and place a TLS reverse
 proxy in front of them.
 The supported single-domain layout is `/` for Guidelines, `/admin` for the
@@ -260,9 +261,14 @@ must preserve—not strip—the `/admin` prefix.
 
 ### Browser-visible object storage
 
-Private assets are returned as presigned S3 URLs. Production needs a separate
-public HTTPS S3 API endpoint, for example `assets.mediguide.health.go.ug`.
-Create DNS and TLS for that hostname and route it to MinIO API port 9000.
+Private assets are returned as presigned S3 URLs. Production needs a
+browser-reachable HTTPS S3 API endpoint. The same-domain option uses
+`S3_PUBLIC_ENDPOINT=mediguide.health.go.ug` and `S3_PUBLIC_SSL=true`, with
+Nginx forwarding `/mediguide/` and `/minio/health/live` to
+`http://127.0.0.1:9000`. This reuses the existing DNS and certificate. The
+example Nginx file includes both routes; change the bucket prefix if
+`S3_BUCKET` differs. An optional separate asset hostname needs its own DNS
+and TLS and a reverse proxy to the same private upstream.
 The reverse proxy must reach the internal Compose network and preserve the
 original Host header, object path and signed query string. The MinIO console
 on port 9001 is a different service. Do not prepend `/storage` or `/admin` to
@@ -270,9 +276,9 @@ S3 object paths and do not rewrite URLs after they have been signed.
 
 Set `S3_PUBLIC_ENDPOINT` to the hostname only and `S3_PUBLIC_SSL=true`.
 `MINIO_API_CORS_ALLOW_ORIGIN` must match the browser origin. The production
-base Compose file does not publish MinIO on the host; a host-installed proxy
-needs a private upstream connection, while a container proxy can share the
-Compose network. Setting DNS or the env hostname alone does not create that
+base Compose file publishes only the MinIO API on loopback; a host-installed
+proxy uses `127.0.0.1:9000`, while a container proxy can share the Compose
+network and use `minio:9000`. Do not use the server public IP as the upstream. Setting DNS or the env hostname alone does not create that
 proxy connection.
 
 Validate the configuration and public DNS/TLS/API health without displaying
@@ -283,7 +289,11 @@ python3 infra/check-public-storage.py infra/production.env --check-network
 ```
 
 The production deployment script runs this check before replacing the stack.
-A missing endpoint or an unreachable public storage API stops deployment.
+A missing endpoint, an unreachable public storage API, or website HTML
+returned in place of MinIO health stops deployment. On an existing server,
+apply the MinIO loopback port mapping before this preflight and confirm the
+Nginx routes are active. Reopen the asset library after deployment to generate
+new signed URLs; changing an already-signed hostname invalidates its signature.
 After a server-side env change, recreate the API with the same Compose and
 release env files, then reopen the asset library to generate fresh URLs:
 
@@ -416,7 +426,8 @@ Emergency/high-priority jobs receive the next available capacity; queue aging
 gradually raises older normal work so lower-priority documents are not starved.
 
 CI runs `infra/check-production-ports.py` against the rendered production
-definition and fails if a data or worker service is published, a public service
+definition and fails if a data or worker service is published beyond the
+MinIO API loopback exception, a public service
 targets the wrong container port, or one of the three HTTP listeners is not
 bound to the configured public interface.
 
