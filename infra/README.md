@@ -263,21 +263,36 @@ must preserve—not strip—the `/admin` prefix.
 Private assets are returned as presigned S3 URLs. Production needs a
 browser-reachable HTTPS S3 API endpoint. The same-domain option uses
 `S3_PUBLIC_ENDPOINT=mediguide.health.go.ug` and `S3_PUBLIC_SSL=true`, with
-Nginx forwarding `/mediguide/` and `/minio/health/live` to
-`http://127.0.0.1:9000`. This reuses the existing DNS and certificate. The
+Nginx forwarding `/mediguide/` and `/minio/health/live` to the MinIO API
+upstream reachable from the proxy. This reuses the existing DNS and certificate. The
 example Nginx file includes both routes; change the bucket prefix if
 `S3_BUCKET` differs. An optional separate asset hostname needs its own DNS
 and TLS and a reverse proxy to the same private upstream.
-The reverse proxy must reach the internal Compose network and preserve the
+The reverse proxy must reach MinIO through its Docker network or the app
+server's published API port and preserve the
 original Host header, object path and signed query string. The MinIO console
 on port 9001 is a different service. Do not prepend `/storage` or `/admin` to
 S3 object paths and do not rewrite URLs after they have been signed.
 
 Set `S3_PUBLIC_ENDPOINT` to the hostname only and `S3_PUBLIC_SSL=true`.
 `MINIO_API_CORS_ALLOW_ORIGIN` must match the browser origin. The production
-base Compose file publishes the MinIO API on `0.0.0.0:9000`; a host-installed
-proxy uses `127.0.0.1:9000`, while a container proxy can share the Compose
-network and use `minio:9000`. Do not use the server public IP as the upstream. Setting DNS or the env hostname alone does not create that
+base Compose file publishes the MinIO API on `0.0.0.0:9000`. Choose the
+upstream according to where Nginx runs:
+
+| Nginx location | MinIO upstream |
+| --- | --- |
+| On the app host | `http://127.0.0.1:9000` |
+| Container sharing MinIO's Docker network | `http://minio:9000` |
+| Separate container/network or another server | `http://<reachable-app-server-IP>:9000` |
+
+For the last option, use the app server's private IP when reachable, or its
+public IP when required by the deployment network. The firewall must allow
+connections from the proxy to port 9000. Inside a container, `127.0.0.1`
+refers to that container; it does not reach the app host. The host-installed
+Nginx example uses loopback for all application upstreams: replace those
+upstream addresses as well when using a separate proxy. Update both storage
+routes to the same reachable upstream and preserve `Host`, object paths and
+signed queries. Setting DNS or the env hostname alone does not create the
 proxy connection.
 
 Validate the configuration and public DNS/TLS/API health without displaying

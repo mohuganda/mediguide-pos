@@ -1,5 +1,8 @@
 # Install as /etc/nginx/conf.d/mediguide.conf (or the distribution-equivalent
 # site file), replace the hostname and certificate paths, then run nginx -t.
+# This example assumes host-installed Nginx. For a separate proxy, replace
+# every 127.0.0.1 upstream with a reachable app-server address or Docker
+# service name. Storage uses minio:9000 only on a shared Docker network.
 
 server {
     listen 80;
