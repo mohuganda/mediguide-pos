@@ -73,6 +73,16 @@ class ProductionEnvironmentToolsTest(unittest.TestCase):
             path.write_text(f"SMTP_PASSWORD=opaque-fixture\nS3_PUBLIC_ENDPOINT={endpoint}\nS3_PUBLIC_SSL={ssl}\n")
             return checker.storage_url(path)
 
+    def test_deployment_bootstraps_minio_before_public_health_and_stack_replacement(self):
+        script = (ROOT / "infra/deploy-production.sh").read_text()
+        bootstrap = script.index('up --no-build -d --no-deps --wait --wait-timeout 120 minio')
+        network_check = script.index('"${production_env}" --check-network')
+        replacement = script.index('down --remove-orphans')
+        self.assertLess(script.index('config --quiet'), bootstrap)
+        self.assertLess(script.index('Using immutable release images preloaded'), bootstrap)
+        self.assertLess(bootstrap, network_check)
+        self.assertLess(network_check, replacement)
+
     def test_validates_https_browser_facing_storage(self):
         self.assertEqual(self.check("assets.example.org"), "https://assets.example.org")
         self.assertEqual(self.check("assets.example.org:9443"), "https://assets.example.org:9443")

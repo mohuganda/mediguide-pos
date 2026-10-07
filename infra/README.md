@@ -304,9 +304,11 @@ python3 infra/check-public-storage.py infra/production.env --check-network
 
 The production deployment script runs this check before replacing the stack.
 A missing endpoint, an unreachable public storage API, or website HTML
-returned in place of MinIO health stops deployment. On an existing server,
-apply the MinIO API port mapping before this preflight and confirm the
-Nginx routes are active. Reopen the asset library after deployment to generate
+returned in place of MinIO health stops deployment. After configuration and
+image validation, deployment applies the MinIO API port mapping and waits for
+its local health before checking the public route. This can recreate MinIO,
+but the application stack is not stopped if the public route fails. Configure
+both Nginx routes on the proxy server before starting deployment. Reopen the asset library after deployment to generate
 new signed URLs; changing an already-signed hostname invalidates its signature.
 After a server-side env change, recreate the API with the same Compose and
 release env files, then reopen the asset library to generate fresh URLs:
