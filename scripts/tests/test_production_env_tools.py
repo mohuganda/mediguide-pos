@@ -20,9 +20,39 @@ def load(name, filename):
 organizer = load("organize_env", "organize-env.py")
 checker = load("check_public_storage", "check-public-storage.py")
 production = load("check_production_env", "check-production-env.py")
+auditor = load("audit_production_config", "audit-production-config.py")
 
 
 class ProductionEnvironmentToolsTest(unittest.TestCase):
+    def test_production_route_audit_accepts_canonical_urls_and_account_fallback(self):
+        config = self.production_routes()
+        auditor.validate_routes(config)
+        config["services"]["api"]["environment"]["ACCOUNT_ACTION_URL"] = ""
+        auditor.validate_routes(config)
+
+    def production_routes(self):
+        origin = "https://mediguide.example.test"
+        return {"services": {
+            "api": {"environment": {"ALLOWED_ORIGINS": origin, "ACCOUNT_ACTION_URL": origin + "/admin", "MAIL_DRIVER": "resend"}},
+            "guidelines": {"environment": {"MEDIGUIDE_API_URL": origin, "MEDIGUIDE_POS_URL": origin + "/admin/login"}},
+        }}
+
+    def test_production_route_audit_rejects_misaligned_links_and_nonproduction_settings(self):
+        for service, key, value in [
+            ("api", "ACCOUNT_ACTION_URL", "https://staging.example.test/admin"),
+            ("api", "ACCOUNT_ACTION_URL", "https://mediguide.example.test/admin/login"),
+            ("api", "ALLOWED_ORIGINS", "*"),
+            ("api", "MAIL_DRIVER", "development"),
+            ("guidelines", "MEDIGUIDE_API_URL", "http://localhost:8080"),
+            ("guidelines", "MEDIGUIDE_API_URL", "https://mediguide.example.test/api"),
+            ("guidelines", "MEDIGUIDE_POS_URL", "https://staging.example.test/admin/login"),
+        ]:
+            with self.subTest(key=key, value=value):
+                config = self.production_routes()
+                config["services"][service]["environment"][key] = value
+                with self.assertRaises(ValueError):
+                    auditor.validate_routes(config)
+
     def test_production_requires_complete_mapping_and_mail_credentials(self):
         source = (ROOT / "infra/production.env.example").read_bytes()
         with tempfile.TemporaryDirectory() as directory:

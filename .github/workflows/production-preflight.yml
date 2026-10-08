@@ -2,6 +2,15 @@ name: Production environment preflight
 
 on:
   workflow_dispatch:
+    inputs:
+      audit_remote:
+        description: Compare the protected settings with the live production server
+        type: boolean
+        default: false
+      skip_public_storage_check:
+        description: Skip the external MinIO probe while retaining storage format validation
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -45,7 +54,47 @@ jobs:
           fi
           python3 infra/organize-env.py infra/production.env --private
           python3 infra/check-production-env.py infra/production.env
-          python3 infra/check-public-storage.py infra/production.env --check-network
+          python3 infra/check-public-storage.py infra/production.env
+      - name: Check public storage connectivity
+        if: ${{ !inputs.skip_public_storage_check }}
+        run: python3 infra/check-public-storage.py infra/production.env --check-network
+      - name: Audit live production configuration without mutation
+        if: ${{ inputs.audit_remote }}
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          for name in DEPLOY_HOST DEPLOY_PORT DEPLOY_USER DEPLOY_PATH DEPLOY_SSH_PRIVATE_KEY DEPLOY_KNOWN_HOSTS; do
+            test -n "${!name}" || { echo "Missing protected setting: ${name}" >&2; exit 1; }
+          done
+          [[ "${DEPLOY_HOST}" =~ ^[A-Za-z0-9.-]+$ ]]
+          [[ "${DEPLOY_PORT}" =~ ^[0-9]{1,5}$ ]]
+          (( 10#${DEPLOY_PORT} >= 1 && 10#${DEPLOY_PORT} <= 65535 ))
+          [[ "${DEPLOY_USER}" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]]
+          [[ "${DEPLOY_PATH}" =~ ^/[A-Za-z0-9._/-]+$ && "${DEPLOY_PATH}" != "/" && "${DEPLOY_PATH}" != *".."* ]]
+          key="${RUNNER_TEMP}/production-audit-key"
+          hosts="${RUNNER_TEMP}/production-audit-known-hosts"
+          printf '%s\n' "${DEPLOY_SSH_PRIVATE_KEY}" > "${key}"
+          printf '%s\n' "${DEPLOY_KNOWN_HOSTS}" > "${hosts}"
+          target="${DEPLOY_USER}@${DEPLOY_HOST}"
+          ssh_options=(-i "${key}" -p "${DEPLOY_PORT}" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=${hosts}" -o ConnectTimeout=15)
+          remote_dir="$(ssh "${ssh_options[@]}" "${target}" 'umask 077; mktemp -d /tmp/mediguide-audit.XXXXXXXX')"
+          [[ "${remote_dir}" =~ ^/tmp/mediguide-audit\.[A-Za-z0-9]+$ ]]
+          cleanup() {
+            ssh "${ssh_options[@]}" "${target}" "rm -rf -- '${remote_dir}'" || true
+            rm -f "${key}" "${hosts}"
+          }
+          trap cleanup EXIT
+          scp -i "${key}" -P "${DEPLOY_PORT}" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=${hosts}" \
+            infra/production.env infra/audit-production-config.py "${target}:${remote_dir}/"
+          ssh "${ssh_options[@]}" "${target}" \
+            "python3 '${remote_dir}/audit-production-config.py' '${DEPLOY_PATH}/infra' '${remote_dir}/production.env'"
       - name: Remove protected environment file
         if: always()
         run: rm -f infra/production.env
