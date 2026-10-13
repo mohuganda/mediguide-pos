@@ -47,10 +47,11 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8090
 ```
 
-If you use the default Ollama embeddings, pull the model before running ingestion or RAG:
+Pull the default response and embedding models before running ingestion or RAG:
 
 ```bash
 ollama pull mxbai-embed-large:latest
+ollama pull gemma3:4b
 ```
 
 If you switch `EMBEDDING_PROVIDER=sentence_transformers`, install the optional model stack separately:
@@ -120,7 +121,7 @@ EMBEDDING_PROVIDER=ollama
 OLLAMA_EMBEDDING_MODEL=mxbai-embed-large:latest
 EMBEDDING_DIM=1024
 LLM_PROVIDER=ollama
-OLLAMA_MODEL=qwen2.5:7b-instruct
+OLLAMA_MODEL=gemma3:4b
 ```
 
 For lightweight development without model downloads:
@@ -133,4 +134,50 @@ LLM_PROVIDER=extractive
 
 ## Important clinical safety rule
 
-The RAG service should only answer from retrieved approved guideline chunks. If relevant context is not found, it returns an insufficient-evidence response instead of guessing.
+Every agent uses strict document excerpts from retrieved, approved chunks of the
+current published documents (including ingested PDFs). Gemma selects source
+numbers and fixed section headings; the server inserts complete source passages
+and builds citations from stored metadata. Model-authored factual prose is never
+displayed. This deliberately limits writing/report output to organized quotations,
+rather than free-form paraphrases or translations.
+
+Selections with invented source numbers, extra prose, invalid structure, or no
+support return an insufficient-evidence response with no citations and
+`grounded=false`. Generation failures also fail closed. Previous chat answers and
+user assertions are never used as factual evidence. The backend preserves worker
+refusals; its local search path returns only labelled source snippets.
+
+This prevents the model from adding unsupported claims, but source correctness,
+PDF extraction accuracy, completeness of retrieved context, and passage relevance
+still require review. It is not a guarantee that every selected passage answers
+every part of a clinical question.
+
+## Response agents
+
+Ollama uses `gemma3:4b` by default. Set `OLLAMA_MODEL` to use another installed
+model. The embedding model stays `mxbai-embed-large:latest`, so switching the
+response model does not require reindexing existing documents. `make up` pulls
+the configured models and rebuilds the AI worker.
+
+The existing RAG endpoint automatically selects a response agent from the request:
+
+| Request | Agent | Output |
+| --- | --- | --- |
+| “What are the signs of malaria?” | Clinical | Relevant document excerpts with source citations |
+| “Write a patient handout about malaria prevention” | Writing | Source excerpts organized under Draft |
+| “Prepare a report on malaria prevention” | Report | Source excerpts organized into supported report sections |
+
+Revisions such as “Make it shorter” retain the previous user's requested agent;
+a new clinical question returns to clinical Q&A. Routing is deterministic and
+adds no model request. Each agent supplies its own instructions to the configured
+generation provider. Writing and report agents can use up to six retrieved
+chunks; clinical answers use up to three. The selected agent is recorded in
+the worker HTTP response's `safety.agent` field.
+
+All agents use the same evidence checks and citation handling. Reports use
+indexed guidance, not live facility analytics. Requests requiring counts, dates,
+patient details, or outcomes absent from the documents must be declined.
+`LLM_PROVIDER=extractive` selects and displays complete retrieved passages
+without a model call, under an Evidence heading. The HTTP response records
+`safety.grounding_mode=document_excerpts`; this describes source provenance,
+not a clinical correctness assessment.

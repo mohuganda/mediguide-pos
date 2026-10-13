@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 import pytest
+import httpx
 
 import app.services.rag_service as rag_module
 
@@ -70,7 +71,7 @@ def make_settings(**overrides: object) -> SimpleNamespace:
         "rag_min_similarity": 0.15,
         "rag_national_first": True,
         "llm_provider": "extractive",
-        "ollama_model": "qwen2.5:7b-instruct",
+        "ollama_model": "gemma3:4b",
         "ollama_base_url": "http://ollama:11434",
         "openai_chat_model": "gpt-4o-mini",
         "openai_api_key": None,
@@ -95,6 +96,127 @@ def build_service(
     monkeypatch.setattr(rag_module, "get_embedding_provider", lambda: embedder)
     monkeypatch.setattr(rag_module, "SearchRepository", lambda: search)
     return rag_module.RagService(), embedder, search
+
+
+@pytest.mark.parametrize(("question", "agent", "instruction"), [
+    ("What is malaria?", "clinical", "Select document passages"),
+    ("Write a handout about malaria", "writing", "Select and organize document passages"),
+    ("Prepare a report on malaria", "report", "Organize document passages into a report"),
+    ("I need a report on malaria", "report", "Organize document passages into a report"),
+])
+def test_gemma_generation_uses_selected_agent(monkeypatch, question, agent, instruction):
+    hit = {
+        "id": "malaria-source", "title": "Malaria",
+        "content": "Malaria guidance from an approved source.", "similarity": 0.8,
+    }
+    service, _, _ = build_service(
+        monkeypatch, settings=make_settings(llm_provider="ollama"), vector_hits=[hit],
+    )
+    payloads = []
+
+    def generate(request):
+        import json
+        payloads.append(json.loads(request.content))
+        return httpx.Response(200, json={"response": '{"sections":[{"heading":"Evidence","sources":[1]}]}'})
+
+    real_client = httpx.Client
+    monkeypatch.setattr(rag_module.httpx, "Client", lambda **kwargs: real_client(
+        transport=httpx.MockTransport(generate), **kwargs,
+    ))
+    result = service.ask(question)
+    assert result["safety"]["agent"] == agent
+    assert result["safety"]["provider"] == "ollama"
+    assert result["safety"]["generation_error"] is None
+    assert result["citations"][0]["chunk_id"] == "malaria-source"
+    assert payloads[0]["model"] == "gemma3:4b"
+    assert instruction in payloads[0]["prompt"]
+    assert "Do not invent facts" in payloads[0]["prompt"]
+
+
+@pytest.mark.parametrize("question", [
+    "Write a handout about malaria", "Prepare a report on malaria",
+])
+def test_agents_do_not_generate_without_sources(monkeypatch, question):
+    service, _, _ = build_service(monkeypatch, settings=make_settings(llm_provider="ollama"))
+    monkeypatch.setattr(service, "_generate_answer", lambda **kwargs: pytest.fail(
+        "An agent must not generate without relevant evidence"
+    ))
+    result = service.ask(question)
+    assert result["answer"] == rag_module.FALLBACK_ANSWER
+    assert result["safety"]["grounded"] is False
+    assert result["citations"] == []
+
+
+def test_report_revision_retrieves_previous_topic(monkeypatch):
+    hit = {
+        "id": "malaria-source", "title": "Malaria prevention",
+        "content": "Malaria prevention guidance from an approved source.", "similarity": 0.8,
+    }
+    service, embedder, _ = build_service(monkeypatch, vector_hits=[hit])
+    result = service.ask("Make it shorter", recent_messages=[
+        {"role": "user", "content": "Prepare a report about malaria prevention"},
+        {"role": "assistant", "content": "Draft report on malaria prevention [1]."},
+    ])
+    assert result["safety"]["agent"] == "report"
+    assert result["safety"]["grounded"] is True
+    assert "malaria prevention" in embedder.calls[0][0]
+
+
+def test_report_can_cite_more_than_three_sources(monkeypatch):
+    hits = [
+        {"id": f"source-{i}", "title": "Malaria prevention",
+         "content": f"Malaria prevention guidance section {i}.", "similarity": 0.8}
+        for i in range(6)
+    ]
+    service, _, _ = build_service(monkeypatch, vector_hits=hits)
+
+    def generate(**kwargs):
+        assert len(kwargs["hits"]) == 6
+        assert "[6]" in kwargs["context"]
+        return '{"sections":[{"heading":"Findings","sources":[6]}]}'
+
+    monkeypatch.setattr(service, "_generate_answer", generate)
+    result = service.ask("Prepare a report about malaria prevention")
+    assert result["citations"][0]["chunk_id"] == "source-5"
+
+
+@pytest.mark.parametrize("question", [
+    "What is malaria?", "Write a handout about malaria", "Prepare a report on malaria",
+])
+@pytest.mark.parametrize("model_output", [
+    "Invented malaria treatment [1].",
+    '{"sections":[{"heading":"Answer","sources":[99]}]}',
+    '{"sections":[{"heading":"Answer","sources":[1],"text":"Invented treatment"}]}',
+    '{"sections":[]}',
+])
+def test_every_agent_rejects_unsupported_output_even_with_relevant_hits(
+    monkeypatch, question, model_output,
+):
+    hit = {"id": "source-1", "title": "Malaria", "content": "Malaria source text.",
+           "similarity": 0.8}
+    service, _, _ = build_service(
+        monkeypatch, settings=make_settings(llm_provider="ollama"), vector_hits=[hit],
+    )
+    monkeypatch.setattr(service, "_generate_answer", lambda **kwargs: model_output)
+    response = service.ask(question)
+    assert response["answer"] == rag_module.FALLBACK_ANSWER
+    assert response["citations"] == []
+    assert response["safety"]["grounded"] is False
+
+
+def test_history_is_never_rendered_as_evidence(monkeypatch):
+    hit = {"id": "source-1", "title": "Malaria", "content": "Malaria source text.",
+           "similarity": 0.8}
+    service, _, _ = build_service(
+        monkeypatch, settings=make_settings(llm_provider="ollama"), vector_hits=[hit],
+    )
+    monkeypatch.setattr(service, "_generate_answer", lambda **kwargs:
+                        '{"sections":[{"heading":"Answer","sources":[1]}]}')
+    response = service.ask("What is malaria?", recent_messages=[
+        {"role": "assistant", "content": "Invented malaria cure and statistics."},
+    ])
+    assert "Invented" not in response["answer"]
+    assert "Malaria source text" in response["answer"]
 
 
 def test_ask_propagates_language_country_and_returns_country_metadata(
@@ -250,7 +372,7 @@ def test_merge_hits_preserves_vector_similarity_for_duplicate_chunks(
     assert merged[0]["similarity"] == pytest.approx(0.41)
 
 
-def test_ask_falls_back_to_extractive_when_llm_generation_fails(monkeypatch: pytest.MonkeyPatch):
+def test_ask_declines_when_llm_generation_fails(monkeypatch: pytest.MonkeyPatch):
     hit = {
         "id": "chunk-1",
         "title": "Pneumonia treatment",
@@ -279,10 +401,11 @@ def test_ask_falls_back_to_extractive_when_llm_generation_fails(monkeypatch: pyt
 
     response = service.ask(question="How do I treat non-severe pneumonia?")
 
-    assert response["safety"]["provider"] == "extractive"
+    assert response["safety"]["provider"] == "none"
     assert "RuntimeError: ollama unavailable" == response["safety"]["generation_error"]
-    assert "Give oral amoxicillin" in response["answer"]
-    assert "Sources: [1]" in response["answer"]
+    assert response["answer"] == rag_module.FALLBACK_ANSWER
+    assert response["citations"] == []
+    assert response["safety"]["grounded"] is False
 
 
 def test_ask_rewrites_follow_up_questions_with_recent_context(monkeypatch: pytest.MonkeyPatch):

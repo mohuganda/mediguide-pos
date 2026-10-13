@@ -116,7 +116,7 @@ class Settings(BaseSettings):
     llm_provider: str = "ollama"  # extractive, ollama, openai
     openai_chat_model: str = "gpt-4o-mini"
     ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "qwen2.5:7b-instruct"
+    ollama_model: str = "gemma3:4b"
     ollama_embedding_model: str = Field(
         default="mxbai-embed-large:latest",
         validation_alias=AliasChoices("OLLAMA_EMBEDDING_MODEL"),

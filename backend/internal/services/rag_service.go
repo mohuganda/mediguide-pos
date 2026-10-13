@@ -318,10 +318,12 @@ func (s RAGService) askWithConfiguredProvider(req workerAskRequest) (*AskRespons
 	provider := strings.ToLower(strings.TrimSpace(s.Cfg.AIRAGProvider))
 	if provider == "worker" || provider == "ai-worker" {
 		if res, err := s.askWorker(req); err == nil {
-			if res != nil && strings.TrimSpace(res.Answer) != "" && len(res.Citations) > 0 {
+			// Preserve a document-grounding refusal instead of replacing it with
+			// loosely related local matches that cannot answer the request.
+			if res != nil && strings.TrimSpace(res.Answer) != "" {
 				return res, nil
 			}
-			log.Warn().Msg("ai-worker RAG returned no grounded citations, falling back to approved local search")
+			log.Warn().Msg("ai-worker RAG returned no answer, falling back to approved local search")
 		} else {
 			log.Warn().Err(err).Msg("ai-worker RAG failed, falling back to local search")
 		}

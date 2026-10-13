@@ -225,7 +225,7 @@ services:
       RAG_COUNTRY_BOOST: ${RAG_COUNTRY_BOOST:-0.05}
       LLM_PROVIDER: ollama
       OLLAMA_BASE_URL: http://ollama:11434
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:7b-instruct}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma3:4b}
       OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-mxbai-embed-large:latest}
       OLLAMA_TEMPERATURE: ${OLLAMA_TEMPERATURE:-0}
       OLLAMA_TOP_P: ${OLLAMA_TOP_P:-0.9}
@@ -300,7 +300,7 @@ services:
       RAG_COUNTRY_BOOST: ${RAG_COUNTRY_BOOST:-0.05}
       LLM_PROVIDER: ollama
       OLLAMA_BASE_URL: http://ollama:11434
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:7b-instruct}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma3:4b}
       OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-mxbai-embed-large:latest}
       OLLAMA_TEMPERATURE: ${OLLAMA_TEMPERATURE:-0}
       OLLAMA_TOP_P: ${OLLAMA_TOP_P:-0.9}
@@ -427,7 +427,7 @@ services:
     image: curlimages/curl:8.14.1
     restart: "no"
     environment:
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:7b-instruct}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma3:4b}
       OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-mxbai-embed-large:latest}
     depends_on:
       ollama:
