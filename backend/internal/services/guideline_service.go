@@ -364,6 +364,9 @@ func (s GuidelineService) PublishVersion(versionID uuid.UUID, userID uuid.UUID, 
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&document, "id = ?", v.DocumentID).Error; err != nil {
 			return err
 		}
+		if v.Status == "published" {
+			return restoreWithdrawnGuideline(tx, &document, &v, userID, ip)
+		}
 		if err := ensureVersionReadyForPublish(tx, &v); err != nil {
 			return err
 		}
