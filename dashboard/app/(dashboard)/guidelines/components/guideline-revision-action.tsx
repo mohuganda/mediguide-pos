@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { showToast } from "@/lib/toast"
+import { suggestNextGuidelineVersion } from "@/lib/guideline-version"
 import { GuidelineDocumentRecord, GuidelineDocumentsService, GuidelineVersionRecord, isPublishedAsLink, isPublishedAsUploaded } from "@/services/guideline-documents.service"
 
 export function GuidelineRevisionAction({ document, onChanged }: { document: GuidelineDocumentRecord; onChanged: () => Promise<unknown> }) {
@@ -26,6 +27,10 @@ export function GuidelineRevisionAction({ document, onChanged }: { document: Gui
   async function submit(event: React.FormEvent) {
     event.preventDefault()
     if (busy || !version.trim()) return
+    if (document.versions.some(item => item.version.trim().toLowerCase() === version.trim().toLowerCase())) {
+      setError("This version number already exists. Choose a different version number.")
+      return
+    }
     setBusy(true); setError("")
     try {
       const result = await GuidelineDocumentsService.reviseDocument(document.id, document.withdrawn_version_id!, version.trim())
@@ -39,7 +44,8 @@ export function GuidelineRevisionAction({ document, onChanged }: { document: Gui
   return <>
     <Button variant="outline" onClick={() => {
       if (existing) { goToDraft(existing); return }
-      setOpen(true); setVersion(""); setCreated(null); setError("")
+      const source = document.versions.find(item => item.id === document.withdrawn_version_id)
+      setOpen(true); setVersion(suggestNextGuidelineVersion(source?.version, document.versions.map(item => item.version))); setCreated(null); setError("")
     }}>{existing ? "Continue draft" : "Revise document"}</Button>
     <Dialog open={open} onOpenChange={value => { if (!busy) setOpen(value) }}>
       <DialogContent>
@@ -55,7 +61,7 @@ export function GuidelineRevisionAction({ document, onChanged }: { document: Gui
           {!!created.revision_warnings?.length && <ul className="list-disc space-y-2 pl-5 text-sm">{created.revision_warnings.map((warning, i) => <li key={i}>{warning}</li>)}</ul>}
           <Button onClick={() => { setOpen(false); goToDraft(created) }}>Open draft</Button>
         </div> : <form onSubmit={submit} className="space-y-4">
-          <div className="space-y-2"><Label htmlFor="revision-version">New version number</Label><Input id="revision-version" required maxLength={100} value={version} onChange={event => setVersion(event.target.value)} disabled={busy} /></div>
+          <div className="space-y-2"><Label htmlFor="revision-version">New version number</Label><Input id="revision-version" required maxLength={100} value={version} onChange={event => { setVersion(event.target.value); setError("") }} disabled={busy} aria-describedby="revision-version-help" /><p id="revision-version-help" className="text-sm text-muted-foreground">Suggested from the withdrawn version when its format is numeric. You can change it to match the document’s official version label.</p></div>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <DialogFooter><Button type="button" variant="outline" disabled={busy} onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" disabled={busy || !version.trim()}>{busy ? "Creating…" : "Create revision draft"}</Button></DialogFooter>
         </form>}

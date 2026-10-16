@@ -22,10 +22,10 @@ it("creates a revision and discloses omitted content before opening the editor",
   const onChanged = vi.fn().mockResolvedValue(undefined)
   render(<GuidelineRevisionAction document={document} onChanged={onChanged} />)
   fireEvent.click(screen.getByRole("button", { name: "Revise document" }))
-  expect(screen.getByRole("button", { name: "Create revision draft" })).toBeDisabled()
-  fireEvent.change(screen.getByLabelText("New version number"), { target: { value: " 2 " } })
+  expect(screen.getByLabelText("New version number")).toHaveValue("2")
+  fireEvent.change(screen.getByLabelText("New version number"), { target: { value: " 2.5 " } })
   fireEvent.click(screen.getByRole("button", { name: "Create revision draft" }))
-  await waitFor(() => expect(revise).toHaveBeenCalledWith("doc", "old", "2"))
+  await waitFor(() => expect(revise).toHaveBeenCalledWith("doc", "old", "2.5"))
   expect(await screen.findByText("Omitted unreviewed section: References")).toBeInTheDocument()
   expect(push).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole("button", { name: "Open draft" }))
@@ -63,4 +63,27 @@ it("keeps failed submissions open with entered version and actionable error", as
 it("offers no withdrawal revision action for a current publication", () => {
   render(<GuidelineRevisionAction document={{ ...document, withdrawn_at: null, withdrawn_version_id: null }} onChanged={vi.fn()} />)
   expect(screen.queryByRole("button")).not.toBeInTheDocument()
+})
+
+it("suggests a label beyond existing versions in the withdrawn version's series", () => {
+  const source = { ...document.versions[0], version: "1.0" }
+  render(<GuidelineRevisionAction document={{ ...document, versions: [source, { ...source, id: "later", version: "1.3" }] }} onChanged={vi.fn()} />)
+  fireEvent.click(screen.getByRole("button", { name: "Revise document" }))
+  expect(screen.getByLabelText("New version number")).toHaveValue("1.4")
+})
+
+it("requires a manual label for an unrecognized version format", () => {
+  render(<GuidelineRevisionAction document={{ ...document, versions: [{ ...document.versions[0], version: "Official edition A" }] }} onChanged={vi.fn()} />)
+  fireEvent.click(screen.getByRole("button", { name: "Revise document" }))
+  expect(screen.getByLabelText("New version number")).toHaveValue("")
+  expect(screen.getByRole("button", { name: "Create revision draft" })).toBeDisabled()
+})
+
+it("rejects a manually entered existing label without creating a draft", () => {
+  render(<GuidelineRevisionAction document={document} onChanged={vi.fn()} />)
+  fireEvent.click(screen.getByRole("button", { name: "Revise document" }))
+  fireEvent.change(screen.getByLabelText("New version number"), { target: { value: " 1 " } })
+  fireEvent.click(screen.getByRole("button", { name: "Create revision draft" }))
+  expect(screen.getByRole("alert")).toHaveTextContent("This version number already exists")
+  expect(revise).not.toHaveBeenCalled()
 })
