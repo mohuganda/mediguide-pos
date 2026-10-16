@@ -38,17 +38,6 @@ jobs:
             -o UserKnownHostsFile="$hosts" -o ConnectTimeout=15 \
             "${DEPLOY_USER}@${DEPLOY_HOST}" bash -s <<'REMOTE'
           set -uo pipefail
-          worker=$(docker ps --filter label=com.docker.compose.service=ai-worker-loop --format '{{.ID}}' | head -1)
-          test -n "$worker"
-          docker exec -i "$worker" python - <<'PY'
-          import json
-          from app.core.db import db_conn
-          with db_conn() as conn, conn.cursor() as cur:
-              cur.execute("SET TRANSACTION READ ONLY")
-              cur.execute("SELECT id,status,progress_stage,progress_percent,attempt_count,left(error,1500) AS error,created_at,updated_at,metrics_json FROM ingestion_jobs WHERE version_id=%s ORDER BY created_at DESC LIMIT 3", ("348c5927-ac9f-48a8-a809-1d72a0496d1a",))
-              print(json.dumps(cur.fetchall(), default=str))
-          PY
-          exit
           echo 'Running containers and port bindings:'
           docker ps --format '{{.Names}} {{.Ports}}'
           echo 'Local MinIO live endpoint:'
