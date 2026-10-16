@@ -367,6 +367,13 @@ func (s GuidelineService) PublishVersion(versionID uuid.UUID, userID uuid.UUID, 
 		if v.Status == "published" {
 			return restoreWithdrawnGuideline(tx, &document, &v, userID, ip)
 		}
+		if v.SourceVersionID != nil {
+			withdrawnSource := document.CurrentVersionID == nil && document.WithdrawnAt != nil && document.WithdrawnVersionID != nil && *document.WithdrawnVersionID == *v.SourceVersionID
+			currentSource := document.WithdrawnAt == nil && document.CurrentVersionID != nil && *document.CurrentVersionID == *v.SourceVersionID
+			if !withdrawnSource && !currentSource {
+				return ErrGuidelinePublicationConflict
+			}
+		}
 		if err := ensureVersionReadyForPublish(tx, &v); err != nil {
 			return err
 		}
@@ -424,7 +431,7 @@ func (s GuidelineService) PublishVersion(versionID uuid.UUID, userID uuid.UUID, 
 			return err
 		}
 		if document.WithdrawnAt != nil {
-			if err := writeGuidelineAudit(tx, userID, "guideline.document.republished", "guideline_document", document.ID, ip, map[string]any{
+			if err := writeGuidelineAudit(tx, userID, "guideline.document.replacement_published", "guideline_document", document.ID, ip, map[string]any{
 				"version_id": versionID, "withdrawn_version_id": document.WithdrawnVersionID,
 				"previous_withdrawal_reason": document.WithdrawalReason,
 			}); err != nil {
